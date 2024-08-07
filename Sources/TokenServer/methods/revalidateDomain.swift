@@ -14,9 +14,8 @@ extension TokenServer {
     public func revalidateDomain(_ request: Request) async throws -> Response {
         do {
             let params = try request.query.decode(RevalidateDomainRequestParameters.self)
-            let domain = params.domain
             
-            guard let date = self.tokens[domain]?.revalidate(self.configuration.inactiveDomainTimeout) else {
+            guard let date = self.tokens[params.domain]?.revalidate(self.configuration.inactiveDomainTimeout) else {
                 throw Abort(.notFound, reason: "unknown domain")
             }
             
@@ -30,7 +29,7 @@ extension TokenServer {
                 }
             default: throw Abort(.badRequest, reason: "invalid query")
             }
-        } catch let error as EncodingError {
+        } catch _ as EncodingError {
             throw Abort(.internalServerError, reason: "unable to encode data")
         }
     }

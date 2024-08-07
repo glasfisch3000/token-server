@@ -25,34 +25,29 @@ extension TokenServer {
     public func setToken(_ request: Request) async throws -> Response {
         do {
             let params = try request.query.decode(SetTokenRequestParameters.self)
-            let domain = params.domain
-            let tokenID = params.tokenID
-            let key = params.pubKey
-            let date = params.timestamp
-            let signature = params.signature
             
             var body = try await request.body.collect(upTo: 64)
             guard let tokenValue = body.readString(length: body.readableBytes, encoding: .utf8) else {
                 throw Abort(.badRequest, reason: "unable to decode token value")
             }
             
-            guard date.timeIntervalSinceNow < 0 && date.timeIntervalSinceNow > -self.configuration.signatureTimestampTolerance else {
+            guard params.timestamp.timeIntervalSinceNow < 0 && params.timestamp.timeIntervalSinceNow > -self.configuration.signatureTimestampTolerance else {
                 throw Abort(.forbidden, reason: "invalid timestamp")
             }
             
-            guard var tokenStorage = self.tokens[domain] else {
+            guard var tokenStorage = self.tokens[params.domain] else {
                 throw Abort(.notFound, reason: "unknown domain")
             }
-            guard tokenStorage.authentication == key else {
+            guard tokenStorage.authentication == params.pubKey else {
                 throw Abort(.forbidden, reason: "invalid key")
             }
             
-            guard try verify(params.signature, request: .setToken(domain: params.domain, tokenID: tokenID, token: tokenValue), date: date, key: params.pubKey) else {
+            guard try verify(params.signature, request: .setToken(domain: params.domain, tokenID: params.tokenID, token: tokenValue), date: params.timestamp, key: params.pubKey) else {
                 throw Abort(.forbidden, reason: "invalid signature")
             }
             
-            self.tokens[domain]?.tokens[tokenID] = tokenValue
-            self.tokens[domain]?.revalidate(self.configuration.inactiveDomainTimeout)
+            self.tokens[params.domain]?.tokens[params.tokenID] = tokenValue
+            self.tokens[params.domain]?.revalidate(self.configuration.inactiveDomainTimeout)
             
             return Response(status: .ok, body: "stored")
         } catch let error as DecodingError {
@@ -69,7 +64,7 @@ extension TokenServer {
             switch error {
             case .unableToEncodeUTF8: throw Abort(.internalServerError, reason: "unable to verify signature")
             }
-        } catch let error as NIOTooManyBytesError {
+        } catch _ as NIOTooManyBytesError {
             throw Abort(.payloadTooLarge, reason: "token content too large")
         }
     }

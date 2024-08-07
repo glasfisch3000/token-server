@@ -22,27 +22,23 @@ extension TokenServer {
     public func deleteDomain(_ request: Request) async throws -> Response {
         do {
             let params = try request.query.decode(DeleteDomainRequestParameters.self)
-            let domain = params.domain
-            let key = params.pubKey
-            let date = params.timestamp
-            let signature = params.signature
             
-            guard date.timeIntervalSinceNow < 0 && date.timeIntervalSinceNow > -self.configuration.signatureTimestampTolerance else {
+            guard params.timestamp.timeIntervalSinceNow < 0 && params.timestamp.timeIntervalSinceNow > -self.configuration.signatureTimestampTolerance else {
                 throw Abort(.forbidden, reason: "invalid timestamp")
             }
             
-            guard let tokenStorage = self.tokens[domain] else {
+            guard let tokenStorage = self.tokens[params.domain] else {
                 throw Abort(.notFound, reason: "unknown domain")
             }
-            guard tokenStorage.authentication == key else {
+            guard tokenStorage.authentication == params.pubKey else {
                 throw Abort(.forbidden, reason: "invalid key")
             }
             
-            guard try verify(params.signature, request: .deleteDomain(domain: params.domain), date: date, key: params.pubKey) else {
+            guard try verify(params.signature, request: .deleteDomain(domain: params.domain), date: params.timestamp, key: params.pubKey) else {
                 throw Abort(.forbidden, reason: "invalid signature")
             }
             
-            self.tokens.removeValue(forKey: domain)
+            self.tokens.removeValue(forKey: params.domain)
             return Response(status: .ok, body: "removed")
         } catch let error as DecodingError {
             switch error {

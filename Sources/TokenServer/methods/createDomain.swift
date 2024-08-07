@@ -19,12 +19,11 @@ extension TokenServer {
     public func createDomain(_ request: Request) async throws -> Response {
         do {
             let params = try request.query.decode(CreateDomainRequestParameters.self)
-            let key = params.pubKey
             
             let uuid = UUID()
             let expires = Date.now.addingTimeInterval(self.configuration.inactiveDomainTimeout)
             self.tokens[uuid] = .init(domain: uuid,
-                                      authentication: key,
+                                      authentication: params.pubKey,
                                       tokens: [:],
                                       expires: expires)
             
@@ -39,7 +38,7 @@ extension TokenServer {
                 }
             default: throw Abort(.badRequest, reason: "invalid query")
             }
-        } catch let error as EncodingError {
+        } catch _ as EncodingError {
             throw Abort(.internalServerError, reason: "unable to encode data")
         }
     }

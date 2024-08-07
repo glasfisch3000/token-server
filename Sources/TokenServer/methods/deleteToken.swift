@@ -24,29 +24,24 @@ extension TokenServer {
     public func deleteToken(_ request: Request) async throws -> Response {
         do {
             let params = try request.query.decode(DeleteTokenRequestParameters.self)
-            let domain = params.domain
-            let tokenID = params.tokenID
-            let key = params.pubKey
-            let date = params.timestamp
-            let signature = params.signature
             
-            guard date.timeIntervalSinceNow < 0 && date.timeIntervalSinceNow > -self.configuration.signatureTimestampTolerance else {
+            guard params.timestamp.timeIntervalSinceNow < 0 && params.timestamp.timeIntervalSinceNow > -self.configuration.signatureTimestampTolerance else {
                 throw Abort(.forbidden, reason: "invalid timestamp")
             }
             
-            guard var tokenStorage = self.tokens[domain] else {
+            guard let tokenStorage = self.tokens[params.domain] else {
                 throw Abort(.notFound, reason: "unknown domain")
             }
-            guard tokenStorage.authentication == key else {
+            guard tokenStorage.authentication == params.pubKey else {
                 throw Abort(.forbidden, reason: "invalid key")
             }
             
-            guard try verify(params.signature, request: .deleteToken(domain: params.domain, tokenID: tokenID), date: date, key: params.pubKey) else {
+            guard try verify(params.signature, request: .deleteToken(domain: params.domain, tokenID: params.tokenID), date: params.timestamp, key: params.pubKey) else {
                 throw Abort(.forbidden, reason: "invalid signature")
             }
             
-            self.tokens[domain]?.tokens.removeValue(forKey: tokenID)
-            self.tokens[domain]?.revalidate(self.configuration.inactiveDomainTimeout)
+            self.tokens[params.domain]?.tokens.removeValue(forKey: params.tokenID)
+            self.tokens[params.domain]?.revalidate(self.configuration.inactiveDomainTimeout)
             
             return Response(status: .ok, body: "stored")
         } catch let error as DecodingError {
