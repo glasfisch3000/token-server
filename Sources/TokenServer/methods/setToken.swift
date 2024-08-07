@@ -35,7 +35,7 @@ extension TokenServer {
                 throw Abort(.forbidden, reason: "invalid timestamp")
             }
             
-            guard var tokenStorage = self.tokens[params.domain] else {
+            guard let tokenStorage = self.tokens[params.domain] else {
                 throw Abort(.notFound, reason: "unknown domain")
             }
             guard tokenStorage.authentication == params.pubKey else {
